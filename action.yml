@@ -2,7 +2,7 @@ name: Staging Deploy to ECS on PR Comment
 description: "Work only for PR comments"
 inputs:
   github_token:
-    description: Github token to write comments on PR. Commonly ${{ secrets.GITHUB_TOKEN }}
+    description: Github token to write comments on PR. Commonly secrets.GITHUB_TOKEN
     required: true
   match_comment_to_deploy:
     description: String that will look for in the PR
