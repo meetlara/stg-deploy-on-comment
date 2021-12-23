@@ -60,53 +60,18 @@ runs:
         hub pr checkout ${{ github.event.issue.number }}
         echo "::set-output name=sha::$(git rev-parse HEAD)"
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+    - name: Deploy to ECS
       if: steps.check.outputs.triggered == 'true'
+      uses: meetlara/ecs-deploy@main
       with:
-        aws-access-key-id: ${{ inputs.aws_access_key_id }}
-        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
-        aws-region: us-east-1
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      if: steps.check.outputs.triggered == 'true'
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build, tag, and push image to Amazon ECR
-      shell: bash
-      id: build-image
-      if: steps.check.outputs.triggered == 'true'
-      working-directory: ${{ inputs.working_directory }}
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_NAME: ${{ inputs.ecr_image_name }}
-        IMAGE_TAG: ${{ steps.commit.outputs.sha }}
-      run: |
-        if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
-            echo "Already existed image; skipping."
-        else
-          docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
-        fi
-        echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
-
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      if: steps.check.outputs.triggered == 'true'
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ${{ inputs.task_definition_path }}
-        container-name: ${{ inputs.task_definition_contianer_name }}
-        image: ${{ steps.build-image.outputs.image }}
-
-    - name: Deploy Amazon ECS task definition
-      if: steps.check.outputs.triggered == 'true'
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ inputs.ecs_service_name }}
-        cluster: ${{ inputs.ecs_cluster_name }}
+        aws_access_key_id: ${{ inputs.aws_access_key_id }}
+        aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
+        ecr_image_name: ${{ inputs.ecr_image_name }}
+        task_definition_contianer_name: ${{ inputs.task_definition_contianer_name }}
+        ecs_service_name: ${{ inputs.ecs_service_name }}
+        ecs_cluster_name: ${{ inputs.ecs_cluster_name }}
+        task_definition_path: ${{ inputs.task_definition_path }}
+        working_directory: ${{ inputs.working_directory }}
 
     - name: Message success
       if: ${{ steps.check.outputs.triggered == 'true' && success() }}
