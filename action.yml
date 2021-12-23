@@ -39,7 +39,6 @@ runs:
     - name: Check if @meetlara/deploy is on the message
       uses: khan/pull-request-comment-trigger@master
       id: check
-      working-directory: ${{ inputs.working_directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       with:
@@ -49,14 +48,12 @@ runs:
 
     - name: Checkout
       if: steps.check.outputs.triggered == 'true'
-      working-directory: ${{ inputs.working_directory }}
       uses: actions/checkout@v2
     
     - name: Checkout Pull Request
       shell: bash
       id: commit
       if: steps.check.outputs.triggered == 'true'
-      working-directory: ${{ inputs.working_directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       run: |
@@ -66,7 +63,6 @@ runs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
       if: steps.check.outputs.triggered == 'true'
-      working-directory: ${{ inputs.working_directory }}
       with:
         aws-access-key-id: ${{ inputs.aws_access_key_id }}
         aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
@@ -75,7 +71,6 @@ runs:
     - name: Login to Amazon ECR
       id: login-ecr
       if: steps.check.outputs.triggered == 'true'
-      working-directory: ${{ inputs.working_directory }}
       uses: aws-actions/amazon-ecr-login@v1
 
     - name: Build, tag, and push image to Amazon ECR
@@ -100,7 +95,6 @@ runs:
       if: steps.check.outputs.triggered == 'true'
       id: task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
-      working-directory: ${{ inputs.working_directory }}
       with:
         task-definition: ${{ inputs.task_definition_path }}
         container-name: ${{ inputs.task_definition_contianer_name }}
@@ -109,7 +103,6 @@ runs:
     - name: Deploy Amazon ECS task definition
       if: steps.check.outputs.triggered == 'true'
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      working-directory: ${{ inputs.working_directory }}
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: ${{ inputs.ecs_service_name }}
@@ -118,7 +111,6 @@ runs:
     - name: Message success
       if: ${{ steps.check.outputs.triggered == 'true' && success() }}
       uses: actions/github-script@v4
-      working-directory: ${{ inputs.working_directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       with:
@@ -133,7 +125,6 @@ runs:
     - name: Message failure
       if: ${{ steps.check.outputs.triggered == 'true' && failure() }}
       uses: actions/github-script@v4
-      working-directory: ${{ inputs.working_directory }}
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
       with:
