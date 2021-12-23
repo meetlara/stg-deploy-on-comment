@@ -1,0 +1,132 @@
+name: Staging Deploy to ECS on PR Comment
+description: "Work only for PR comments"
+inputs:
+  github_token:
+    description: Github token to write comments on PR. Commonly ${{ secrets.GITHUB_TOKEN }}
+    required: true
+  match_comment_to_deploy:
+    description: String that will look for in the PR
+    required: false
+    default: '@meetlara/deploy'
+  aws_access_key_id:
+    description: AWS Key ID
+    required: true
+  aws_secret_access_key:
+    description: AWS Secret Access Key
+    required: true
+  ecr_image_name:
+    description: Define the name of the ECR image registry
+    required: true
+  task_definition_contianer_name:
+    description: Define the name of the container in the Task Definition
+    required: true
+  ecs_service_name:
+    description: Define the name of the ECS Service
+    required: true
+  ecs_cluster_name:
+    description: Define the name of the ECS Cluster
+    required: true
+  task_definition_path:
+    description: Define the path to the Task Definition
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Check if @meetlara/deploy is on the message
+      uses: khan/pull-request-comment-trigger@master
+      id: check
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      with:
+        trigger: ${{ inputs.match_comment_to_deploy }}
+        prefix_only: true
+        reaction: 'rocket'
+
+    - name: Checkout
+      if: steps.check.outputs.triggered == 'true'
+      uses: actions/checkout@v2
+    
+    - name: Checkout Pull Request
+      shell: bash
+      id: commit
+      if: steps.check.outputs.triggered == 'true'
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        hub pr checkout ${{ github.event.issue.number }}
+        echo "::set-output name=sha::$(git rev-parse HEAD)"
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      if: steps.check.outputs.triggered == 'true'
+      with:
+        aws-access-key-id: ${{ inputs.aws_access_key_id }}
+        aws-secret-access-key: ${{ inputs.aws_secret_access_key }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      if: steps.check.outputs.triggered == 'true'
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR
+      shell: bash
+      id: build-image
+      if: steps.check.outputs.triggered == 'true'
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_NAME: ${{ inputs.ecr_image_name }}
+        IMAGE_TAG: ${{ steps.commit.outputs.sha }}
+      run: |
+        if docker pull $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG ; then
+            echo "Already existed image; skipping."
+        else
+          docker build -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+        fi
+        echo "::set-output name=image::$ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      if: steps.check.outputs.triggered == 'true'
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ inputs.task_definition_path }}
+        container-name: ${{ inputs.task_definition_contianer_name }}
+        image: ${{ steps.build-image.outputs.image }}
+
+    - name: Deploy Amazon ECS task definition
+      if: steps.check.outputs.triggered == 'true'
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ inputs.ecs_service_name }}
+        cluster: ${{ inputs.ecs_cluster_name }}
+
+    - name: Message success
+      if: ${{ steps.check.outputs.triggered == 'true' && success() }}
+      uses: actions/github-script@v4
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      with:
+        script: |
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: 'Deployment succeeded! 🚀\n\nYou can check the deploy logs [here](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + ')\n\nRemember, it\'s not deployed yet. AWS is doing some magic and in 2 mins it will be available 😄',
+          });
+      
+    - name: Message failure
+      if: ${{ steps.check.outputs.triggered == 'true' && failure() }}
+      uses: actions/github-script@v4
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      with:
+        script: |
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: 'Deployment failed! ❌\n\nYou can check errors on deploy logs [here](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + ')',
+          });
