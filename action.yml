@@ -67,6 +67,7 @@ runs:
         aws_access_key_id: ${{ inputs.aws_access_key_id }}
         aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
         ecr_image_name: ${{ inputs.ecr_image_name }}
+        ecr_tag_name: ${{ steps.commit.outputs.sha }}
         task_definition_contianer_name: ${{ inputs.task_definition_contianer_name }}
         ecs_service_name: ${{ inputs.ecs_service_name }}
         ecs_cluster_name: ${{ inputs.ecs_cluster_name }}
