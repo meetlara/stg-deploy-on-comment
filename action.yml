@@ -7,7 +7,7 @@ inputs:
   match_comment_to_deploy:
     description: String that will look for in the PR
     required: false
-    default: '@meetlara/deploy'
+    default: "deploy api"
   aws_access_key_id:
     description: AWS Key ID
     required: true
@@ -17,7 +17,7 @@ inputs:
   ecr_image_name:
     description: Define the name of the ECR image registry
     required: true
-  task_definition_contianer_name:
+  task_definition_container_name:
     description: Define the name of the container in the Task Definition
     required: true
   ecs_service_name:
@@ -29,10 +29,13 @@ inputs:
   task_definition_path:
     description: Define the path to the Task Definition
     required: true
-  working_directory:
-    description: Define the path of working dir
+  build_working_directory:
+    description: Define the path of working directory of code to build Docker image
+    required: true
+  docker_build_extra_args:
+    description: Define the extra arguments that you will set to docker build command
     required: false
-    default: ./api
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -44,12 +47,12 @@ runs:
       with:
         trigger: ${{ inputs.match_comment_to_deploy }}
         prefix_only: true
-        reaction: 'rocket'
+        reaction: "rocket"
 
     - name: Checkout
       if: steps.check.outputs.triggered == 'true'
       uses: actions/checkout@v2
-    
+
     - name: Checkout Pull Request
       shell: bash
       id: commit
@@ -62,17 +65,18 @@ runs:
 
     - name: Deploy to ECS
       if: steps.check.outputs.triggered == 'true'
-      uses: meetlara/ecs-deploy@main
+      uses: meetlara/ecs-deploy@v2
       with:
         aws_access_key_id: ${{ inputs.aws_access_key_id }}
         aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
         ecr_image_name: ${{ inputs.ecr_image_name }}
         ecr_image_tag: ${{ steps.commit.outputs.sha }}
-        task_definition_contianer_name: ${{ inputs.task_definition_contianer_name }}
+        task_definition_container_name: ${{ inputs.task_definition_container_name }}
         ecs_service_name: ${{ inputs.ecs_service_name }}
         ecs_cluster_name: ${{ inputs.ecs_cluster_name }}
         task_definition_path: ${{ inputs.task_definition_path }}
-        working_directory: ${{ inputs.working_directory }}
+        build_working_directory: ${{ inputs.build_working_directory }}
+        docker_build_extra_args: ${{ inputs.docker_build_extra_args }}
 
     - name: Message success
       if: ${{ steps.check.outputs.triggered == 'true' && success() }}
@@ -87,7 +91,7 @@ runs:
             repo: context.repo.repo,
             body: 'Deployment succeeded! 🚀\n\nYou can check the deploy logs [here](https://github.com/' + context.repo.owner + '/' + context.repo.repo + '/actions/runs/' + context.runId + ')\n\nRemember, it\'s not deployed yet. AWS is doing some magic and in 2 mins it will be available 😄',
           });
-      
+
     - name: Message failure
       if: ${{ steps.check.outputs.triggered == 'true' && failure() }}
       uses: actions/github-script@v4
