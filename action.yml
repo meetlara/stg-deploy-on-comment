@@ -69,7 +69,7 @@ runs:
         aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
         ecr_image_name: ${{ inputs.ecr_image_name }}
         ecr_image_tag: ${{ steps.commit.outputs.sha }}
-        task_definition_contianer_name: ${{ inputs.task_definition_contianer_name }}
+        task_definition_container_name: ${{ inputs.task_definition_container_name }}
         ecs_service_name: ${{ inputs.ecs_service_name }}
         ecs_cluster_name: ${{ inputs.ecs_cluster_name }}
         task_definition_path: ${{ inputs.task_definition_path }}
