@@ -79,7 +79,7 @@ runs:
 
     - name: Deploy to ECS
       if: steps.check.outputs.triggered == 'true'
-      uses: meetlara/ecs-deploy@v2
+      uses: meetlara/ecs-deploy@v3
       with:
         aws_access_key_id: ${{ inputs.aws_access_key_id }}
         aws_secret_access_key: ${{ inputs.aws_secret_access_key }}
